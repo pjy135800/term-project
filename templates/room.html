@@ -11,8 +11,11 @@
         <span>초대코드</span>
         <div class="invite-code-row">
             <strong class="invite-code">{{ room["code"] }}</strong>
-            <button type="button" class="copy-code" data-copy="{{ room['code'] }}" title="초대코드 복사">
-                복사하기
+            <button type="button"
+                    class="copy-code"
+                    data-copy="{{ url_for('room', room_code=room['code'], _external=True) }}"
+                    title="친구에게 보낼 초대 링크 복사">
+                친구 초대하기
             </button>
         </div>
         <small id="copy-feedback"></small>
@@ -25,21 +28,41 @@
     <div><span>진행 상태</span><strong id="room-status">{{ "결과 확정" if room["status"] == "finalized" else "의견 수집 중" }}</strong></div>
 </div>
 
-{% if handoff %}
+{% if final_summary %}
 <section class="result-band">
     <div class="section-heading">
         <div>
             <p class="eyebrow">최종 결과</p>
-            <h2>{{ handoff["meeting_date"] }} {{ room["final_slot"] }}</h2>
+            {% if final_summary["final_date"] %}
+            <h2>{{ final_summary["final_date"] }} {{ final_summary["final_slot"] }}</h2>
+            {% else %}
+            <h2>날짜 미정</h2>
+            <p>날짜는 확정하지 않고 투표 후보 결과만 저장했습니다.</p>
+            {% endif %}
         </div>
+        {% if handoff %}
         <a class="secondary-button" href="{{ url_for('room_handoff', room_code=room['code']) }}" target="_blank">전달 JSON 열기</a>
+        {% endif %}
     </div>
     <div class="theme-result-list">
-        {% for theme in handoff["themes"] %}
-        <span><b>{{ theme["rank"] }}순위</b> {{ theme["name"] }}</span>
+        {% for theme in final_summary["themes"] %}
+        <span><b>{{ loop.index }}순위</b> {{ theme }}</span>
         {% endfor %}
     </div>
+    {% if not final_summary["final_date"] %}
+    <div class="compact-date-results">
+        {% for group in final_summary["date_groups"] %}
+            {% for item in group["items"] %}
+            {% set parts = item.split("|") %}
+            <span><b>{{ group["rank"] }}순위</b> {{ parts[0] }} {{ parts[1] }} · {{ group["votes"] }}표</span>
+            {% endfor %}
+        {% endfor %}
+    </div>
+    <p class="handoff-pending">팀원 2 전달 JSON은 최종 날짜를 선택한 뒤 생성됩니다.</p>
+    {% endif %}
+    {% if handoff %}
     <pre class="json-preview">{{ handoff | tojson(indent=2) }}</pre>
+    {% endif %}
 </section>
 {% elif member["role"] != "host" and all_submitted %}
 <div class="waiting-message">모든 의견이 모였습니다. 방장이 결과를 취합하는 중입니다.</div>

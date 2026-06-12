@@ -11,16 +11,25 @@
 
 <form method="post" action="{{ url_for('finalize_results', room_code=room['code']) }}" class="form-stack">
     <section class="content-section">
-        <h2>날짜 결과</h2>
-        <div class="ranking-list">
+        <div class="section-heading">
+            <div>
+                <h2>날짜 후보 결과</h2>
+                <p>날짜를 지금 확정하지 않아도 테마 결과를 확인할 수 있습니다.</p>
+            </div>
+        </div>
+        <label class="undecided-date">
+            <input type="radio" name="selected_slot" value="" checked>
+            <span>날짜는 아직 정하지 않기</span>
+        </label>
+        <div class="ranking-list compact-ranking">
             {% for group in results["date_groups"] %}
-            <div class="ranking-group">
+            <div class="ranking-group compact-group">
                 <div class="rank-label">{{ group["rank"] }}순위 <small>{{ group["votes"] }}{% if group["votes"] is number %}표{% endif %}</small></div>
-                <div class="rank-options">
+                <div class="rank-options compact-options">
                     {% for item in group["items"] %}
                     {% set parts = item.split("|") %}
-                    <label class="result-choice">
-                        <input type="radio" name="selected_slot" value="{{ item }}" required>
+                    <label class="result-choice date-result-choice">
+                        <input type="radio" name="selected_slot" value="{{ item }}">
                         <span><b>{{ parts[0] }}</b> {{ parts[1] }}</span>
                     </label>
                     {% endfor %}
@@ -36,7 +45,7 @@
         <div class="section-heading">
             <div>
                 <h2>테마 결과</h2>
-                <p>동률 후보가 많으면 최대 3개를 직접 선택하거나 랜덤 추첨할 수 있습니다.</p>
+                <p>득표 결과를 바탕으로 1~3순위를 직접 정하거나, 동률 구간만 랜덤 게임으로 결정할 수 있습니다.</p>
             </div>
         </div>
         <div class="ranking-list">
@@ -57,16 +66,43 @@
             <div class="empty-state">선택 가능한 테마 결과가 없습니다.</div>
             {% endfor %}
         </div>
-        <div class="selection-mode">
-            <label class="radio-line">
-                <input type="radio" name="theme_selection_mode" value="manual" checked>
-                직접 선택
+        <div class="rank-selection-board">
+            {% for options in results["theme_rank_options"] %}
+            {% set rank = loop.index %}
+            <label class="rank-select-row">
+                <span><b>{{ rank }}순위</b><small>{{ "가장 먼저 추천할 테마" if rank == 1 else "다음 추천 테마" }}</small></span>
+                <select name="ranked_theme_{{ rank }}" class="ranked-theme-select" data-rank="{{ rank }}">
+                    {% if options | length > 1 %}<option value="">후보 중 선택</option>{% endif %}
+                    {% for theme in options %}
+                    <option value="{{ theme }}" {% if options | length == 1 %}selected{% endif %}>{{ theme }}</option>
+                    {% endfor %}
+                </select>
             </label>
-            <label class="radio-line random-option">
-                <input type="radio" name="theme_selection_mode" value="random">
-                랜덤 게임으로 최대 3개 뽑기
-            </label>
+            {% endfor %}
         </div>
+
+        {% set tie_state = namespace(has_tie=false) %}
+        {% for group in results["theme_groups"] %}
+            {% if group["items"] | length > 1 %}{% set tie_state.has_tie = true %}{% endif %}
+        {% endfor %}
+        {% if tie_state.has_tie %}
+        <div class="random-game" id="random-theme-game"
+             data-groups='{{ results["theme_groups"] | tojson | forceescape }}'>
+            <div class="random-game-head">
+                <div>
+                    <strong>동률 순위 결정 게임</strong>
+                    <p id="random-game-guide">득표수가 같은 테마의 순서 또는 마지막 자리를 추첨합니다.</p>
+                </div>
+                <button type="button" class="secondary-button" id="start-random-game">랜덤 게임 START</button>
+            </div>
+            <div class="random-reels" id="random-reels" aria-live="polite">
+                <div class="random-reel"><small>1순위</small><strong>?</strong></div>
+                <div class="random-reel"><small>2순위</small><strong>?</strong></div>
+                <div class="random-reel"><small>3순위</small><strong>?</strong></div>
+            </div>
+            <p class="random-game-status" id="random-game-status">직접 선택하거나 랜덤 게임을 시작하세요.</p>
+        </div>
+        {% endif %}
     </section>
 
     <button class="primary-button" type="submit">최종 결과 확정하기</button>

@@ -1,17 +1,30 @@
 {% extends "base.html" %}
-{% block title %}모임결정 시작{% endblock %}
+{% block title %}야놀까? | 약속 정하기{% endblock %}
 {% block content %}
-<section class="welcome">
-    <p class="eyebrow">친구들과 약속 정하기</p>
-    <h1>방을 만들거나 초대코드로 입장하세요</h1>
+<section class="welcome brand-welcome">
+    <p class="platform-label">약속 정하기 플랫폼</p>
+    <h1 class="brand-title">야놀까?</h1>
+    <p>날짜부터 놀거리까지, 친구들과 한 번에 정해보세요.</p>
 </section>
 
-<div class="mode-tabs" role="tablist">
-    <button class="mode-tab active" type="button" data-panel="create-panel">방 만들기</button>
-    <button class="mode-tab" type="button" data-panel="join-panel">방 입장하기</button>
+<div class="home-actions" role="tablist">
+    <button class="home-action create-action" type="button" data-panel="create-panel">
+        <span class="action-symbol">+</span>
+        <strong>방 만들기</strong>
+        <small>새로운 약속 시작</small>
+    </button>
+    <button class="home-action join-action" type="button" data-panel="join-panel">
+        <span class="action-symbol">→</span>
+        <strong>방 입장하기</strong>
+        <small>초대받은 방 참여</small>
+    </button>
 </div>
 
-<section id="create-panel" class="mode-panel active">
+<section id="create-panel" class="mode-panel home-form-panel">
+    <div class="panel-heading">
+        <button type="button" class="panel-back" aria-label="처음 화면으로 돌아가기">←</button>
+        <div><p>새 약속</p><h2>방 만들기</h2></div>
+    </div>
     <form method="post" action="{{ url_for('create_room') }}" class="form-stack">
         <div class="field-grid two">
             <label>
@@ -41,7 +54,11 @@
     </form>
 </section>
 
-<section id="join-panel" class="mode-panel">
+<section id="join-panel" class="mode-panel home-form-panel">
+    <div class="panel-heading">
+        <button type="button" class="panel-back" aria-label="처음 화면으로 돌아가기">←</button>
+        <div><p>초대받은 약속</p><h2>방 입장하기</h2></div>
+    </div>
     <form method="post" action="{{ url_for('join_room') }}" class="form-stack narrow-form">
         <label>
             <span>초대코드</span>

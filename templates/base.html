@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}모임결정{% endblock %}</title>
+    <title>{% block title %}야놀까?{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script defer src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body>
     <header class="topbar">
-        <a class="brand" href="{{ url_for('home') }}">모임결정</a>
+        <a class="brand" href="{{ url_for('home') }}">야놀까?</a>
         {% if room %}
         <div class="room-chip">
             <span>{{ room["title"] }}</span>

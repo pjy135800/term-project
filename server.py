@@ -33,29 +33,33 @@ USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 TIME_SLOTS = ("아침", "점심", "저녁")
 MAX_DATE_RANGE_DAYS = 31
 MAX_THEME_CHOICES = 5
+THEME_ALIASES = {
+    "pc방": "PC방",
+    "피시방": "PC방",
+    "피씨방": "PC방",
+}
 
 THEME_DATA = {
     "음식": [
-        "오마카세",
-        "파인다이닝",
-        "브런치카페",
-        "포장마차",
+        "한식",
+        "중식",
+        "일식",
+        "양식",
+        "패스트푸드",
+        "카페/디저트",
         "뷔페",
-        "베이커리카페",
-        "이색음식점",
-        "루프탑바",
     ],
     "레저/문화": [
         "방탈출카페",
-        "크라임씬카페",
         "보드게임카페",
-        "미술관",
-        "박물관",
+        "만화카페",
+        "오락실",
+        "PC방",
         "소극장",
         "영화관",
-        "공방",
-        "오락실",
-        "놀이공원",
+        "LP바",
+        "동물카페",
+        "찜질방",
     ],
     "스포츠": [
         "볼링장",
@@ -66,27 +70,8 @@ THEME_DATA = {
         "테니스",
         "골프",
         "롤러스케이트",
-    ],
-    "감성/힐링": [
-        "대형카페",
-        "한옥카페",
-        "LP바",
-        "재즈바",
-        "식물원카페",
-        "찜질방",
-        "만화카페",
-        "아쿠아리움",
-        "드로잉카페",
-    ],
-    "야외": [
         "한강공원",
-        "수목원",
-        "캠핑장",
-        "계곡",
-        "자전거",
-        "야시장",
-        "서울숲",
-        "동물원",
+        "당구장",
     ],
 }
 
@@ -220,6 +205,29 @@ def parse_json(raw: str | None, default: Any) -> Any:
 
 def clean_text(value: Any, limit: int = 100) -> str:
     return " ".join(str(value or "").strip().split())[:limit]
+
+
+def theme_key(value: Any) -> str:
+    return clean_text(value, 50).replace(" ", "").casefold()
+
+
+def canonical_theme_name(value: Any) -> str:
+    cleaned = clean_text(value, 50)
+    key = theme_key(cleaned)
+    return THEME_ALIASES.get(key, cleaned)
+
+
+def dedupe_theme_names(values: list[Any]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        canonical = canonical_theme_name(value)
+        key = theme_key(canonical)
+        if not canonical or not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(canonical)
+    return result
 
 
 def generate_room_code() -> str:
@@ -422,18 +430,32 @@ def build_room_results(room_code: str) -> dict[str, Any]:
         date_groups = ranked_groups(date_votes, 3)
 
     if theme_override:
-        theme_groups = [{"rank": index, "votes": "방장 확정", "items": [theme]} for index, theme in enumerate(theme_override, 1)]
+        normalized_override = dedupe_theme_names(theme_override)
+        theme_groups = [
+            {"rank": index, "votes": "방장 확정", "items": [theme]}
+            for index, theme in enumerate(normalized_override, 1)
+        ]
     else:
         theme_votes: Counter[str] = Counter()
         for submission in submissions:
-            theme_votes.update(parse_json(submission["themes_json"], []))
+            normalized_votes = set(dedupe_theme_names(parse_json(submission["themes_json"], [])))
+            theme_votes.update(normalized_votes)
         theme_groups = theme_ranked_groups(theme_votes)
 
     eligible_themes = [item for group in theme_groups for item in group["items"]]
+    theme_rank_options: list[list[str]] = []
+    occupied_slots = 0
+    for group in theme_groups:
+        if occupied_slots >= 3:
+            break
+        slots_for_group = min(len(group["items"]), 3 - occupied_slots)
+        theme_rank_options.extend([group["items"]] * slots_for_group)
+        occupied_slots += len(group["items"])
     return {
         "date_groups": date_groups,
         "theme_groups": theme_groups,
         "eligible_themes": eligible_themes,
+        "theme_rank_options": theme_rank_options,
         "date_override": date_override,
         "theme_override": theme_override,
     }
@@ -554,6 +576,14 @@ def join_room():
 @room_member_required
 def room(room_code: str, room: Any, member: Any):
     submission = fetch_submission(member["id"])
+    final_summary = None
+    if room["status"] == "finalized":
+        final_summary = {
+            "date_groups": build_room_results(room_code)["date_groups"],
+            "final_date": room["final_date"],
+            "final_slot": room["final_slot"],
+            "themes": parse_json(room["final_themes_json"], []),
+        }
     return render_template(
         "room.html",
         room=room,
@@ -564,6 +594,7 @@ def room(room_code: str, room: Any, member: Any):
         date_override=parse_json(room["date_override_json"], None),
         theme_override=parse_json(room["theme_override_json"], []),
         handoff=build_handoff_payload(room_code),
+        final_summary=final_summary,
     )
 
 
@@ -599,7 +630,7 @@ def save_survey(room_code: str, room: Any, member: Any):
         for theme in custom_theme_text.replace("\n", ",").split(",")
         if clean_text(theme, 50)
     ]
-    themes = list(dict.fromkeys([*preset_themes, *custom_themes]))
+    themes = dedupe_theme_names([*preset_themes, *custom_themes])
 
     def invalid_form(message: str):
         flash(message, "error")
@@ -670,7 +701,7 @@ def host_settings(room_code: str, room: Any, member: Any):
             for theme in request.form.get("fixed_themes", "").replace("\n", ",").split(",")
             if clean_text(theme, 50)
         ]
-        fixed_themes = list(dict.fromkeys(fixed_themes))[:3]
+        fixed_themes = dedupe_theme_names(fixed_themes)[:3]
         if not fixed_themes:
             flash("방장이 확정할 테마를 1개 이상 입력해 주세요.", "error")
             return redirect(url_for("room", room_code=room_code))
@@ -732,29 +763,54 @@ def finalize_results(room_code: str, room: Any, member: Any):
 
     results = build_room_results(room_code)
     available_slots = {item for group in results["date_groups"] for item in group["items"]}
-    selected_slot = request.form.get("selected_slot", "")
-    if selected_slot not in available_slots or "|" not in selected_slot:
-        flash("최종 날짜와 시간대를 선택해 주세요.", "error")
+    selected_slot = request.form.get("selected_slot", "").strip()
+    if selected_slot and (selected_slot not in available_slots or "|" not in selected_slot):
+        flash("선택한 날짜 결과를 확인할 수 없습니다.", "error")
         return redirect(url_for("compile_results", room_code=room_code))
 
     eligible_themes = results["eligible_themes"]
-    if request.form.get("theme_selection_mode") == "random":
-        final_themes = random.sample(eligible_themes, min(3, len(eligible_themes)))
-    else:
-        final_themes = [
+    ranked_themes = [
+        request.form.get(f"ranked_theme_{rank}", "")
+        for rank in range(1, 4)
+    ]
+    submitted_ranked_themes = [theme for theme in ranked_themes if theme]
+    if len(submitted_ranked_themes) != len(
+        {theme_key(theme) for theme in submitted_ranked_themes}
+    ):
+        flash("같은 테마를 여러 순위에 중복으로 선택할 수 없습니다.", "error")
+        return redirect(url_for("compile_results", room_code=room_code))
+
+    for index, theme in enumerate(ranked_themes):
+        if not theme:
+            continue
+        rank_options = results["theme_rank_options"]
+        if index >= len(rank_options) or theme not in rank_options[index]:
+            flash(f"{index + 1}순위 테마가 투표 결과의 해당 순위 후보와 맞지 않습니다.", "error")
+            return redirect(url_for("compile_results", room_code=room_code))
+
+    final_themes = dedupe_theme_names(
+        [theme for theme in ranked_themes if theme in eligible_themes]
+    )[:3]
+
+    # 이전 화면 형식으로 제출된 값도 계속 처리한다.
+    if not final_themes:
+        legacy_themes = [
             theme
             for theme in request.form.getlist("selected_themes")
             if theme in eligible_themes
         ]
-        final_themes = list(dict.fromkeys(final_themes))[:3]
-        if not final_themes and len(eligible_themes) <= 3:
-            final_themes = eligible_themes
+        final_themes = dedupe_theme_names(legacy_themes)[:3]
+    if not final_themes and len(eligible_themes) <= 3:
+        final_themes = eligible_themes
 
     if not final_themes:
         flash("최종 테마를 1개 이상 선택해 주세요.", "error")
         return redirect(url_for("compile_results", room_code=room_code))
 
-    final_date, final_slot = selected_slot.split("|", 1)
+    final_date = None
+    final_slot = None
+    if selected_slot:
+        final_date, final_slot = selected_slot.split("|", 1)
     with connect_db() as db:
         execute(
             db,
@@ -766,7 +822,10 @@ def finalize_results(room_code: str, room: Any, member: Any):
             (final_date, final_slot, json.dumps(final_themes, ensure_ascii=False), room_code),
         )
 
-    flash("최종 결과를 확정했습니다. 팀원 2 전달용 JSON도 생성되었습니다.", "success")
+    if final_date:
+        flash("최종 결과를 확정했습니다. 팀원 2 전달용 JSON도 생성되었습니다.", "success")
+    else:
+        flash("테마 결과를 확정했습니다. 날짜는 후보 결과만 확인하는 미정 상태로 저장했습니다.", "success")
     return redirect(url_for("room", room_code=room_code))
 
 
