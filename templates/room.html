@@ -52,10 +52,18 @@
     {% if not final_summary["final_date"] %}
     <div class="compact-date-results">
         {% for group in final_summary["date_groups"] %}
+        <section class="date-rank-group">
+            <div class="date-rank-heading">
+                <strong>{{ group["rank"] }}순위</strong>
+                <span>{{ group["votes"] }}{% if group["votes"] is number %}표{% endif %}</span>
+            </div>
+            <div class="date-rank-items">
             {% for item in group["items"] %}
             {% set parts = item.split("|") %}
-            <span><b>{{ group["rank"] }}순위</b> {{ parts[0] }} {{ parts[1] }} · {{ group["votes"] }}표</span>
+                <span><b>{{ parts[0] }}</b> {{ parts[1] }}</span>
             {% endfor %}
+            </div>
+        </section>
         {% endfor %}
     </div>
     <p class="handoff-pending">팀원 2 전달 JSON은 최종 날짜를 선택한 뒤 생성됩니다.</p>
@@ -74,9 +82,11 @@
             <p class="eyebrow">참여 현황</p>
             <h2>입장 및 제출 상태</h2>
         </div>
+        {% if room["status"] != "finalized" %}
         <a class="primary-button compact" href="{{ url_for('survey', room_code=room['code']) }}">
             {{ "의견 수정하기" if submission and submission["submitted"] else "설문조사 제출하기" }}
         </a>
+        {% endif %}
     </div>
 
     <div class="member-table" id="member-table" data-status-url="{{ url_for('room_status', room_code=room['code']) }}">

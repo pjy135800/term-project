@@ -427,12 +427,34 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 .random-game-status { min-height: 22px; margin: 12px 0 0; color: #81530f; font-weight: 700; }
 
 .compact-date-results {
+    display: grid;
+    gap: 14px;
+    margin-top: 12px;
+}
+.date-rank-group {
+    border: 1px solid #cfe2da;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.68);
+    overflow: hidden;
+}
+.date-rank-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #cfe2da;
+    background: #fff;
+}
+.date-rank-heading strong { color: var(--primary); font-size: 16px; }
+.date-rank-heading span { color: var(--muted); font-size: 13px; }
+.date-rank-items {
     display: flex;
     flex-wrap: wrap;
     gap: 7px;
-    margin-top: 12px;
+    padding: 11px;
 }
-.compact-date-results span {
+.date-rank-items span {
     padding: 6px 8px;
     border: 1px solid #cfe2da;
     border-radius: 5px;
