@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.flask_secret
+team_rooms.db
+.venv/

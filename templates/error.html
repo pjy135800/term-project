@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}오류{% endblock %}
+{% block content %}
+<section class="error-page">
+    <h1>{{ message }}</h1>
+    <a class="primary-button compact" href="{{ url_for('home') }}">처음으로</a>
+</section>
+{% endblock %}

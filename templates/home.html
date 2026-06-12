@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}모임결정 시작{% endblock %}
+{% block content %}
+<section class="welcome">
+    <p class="eyebrow">친구들과 약속 정하기</p>
+    <h1>방을 만들거나 초대코드로 입장하세요</h1>
+</section>
+
+<div class="mode-tabs" role="tablist">
+    <button class="mode-tab active" type="button" data-panel="create-panel">방 만들기</button>
+    <button class="mode-tab" type="button" data-panel="join-panel">방 입장하기</button>
+</div>
+
+<section id="create-panel" class="mode-panel active">
+    <form method="post" action="{{ url_for('create_room') }}" class="form-stack">
+        <div class="field-grid two">
+            <label>
+                <span>방장 이름</span>
+                <input name="host_name" maxlength="30" required placeholder="예: 김민지">
+            </label>
+            <label>
+                <span>방 이름</span>
+                <input name="title" maxlength="80" required placeholder="예: 여름방학 동기 모임">
+            </label>
+        </div>
+        <label>
+            <span>방 기본 정보</span>
+            <textarea name="description" maxlength="300" rows="3" placeholder="예: 서울에서 하루 놀기, 총 4명"></textarea>
+        </label>
+        <div class="field-grid two">
+            <label>
+                <span>후보 시작일</span>
+                <input type="date" name="start_date" required>
+            </label>
+            <label>
+                <span>후보 종료일</span>
+                <input type="date" name="end_date" required>
+            </label>
+        </div>
+        <button class="primary-button" type="submit">방 만들기</button>
+    </form>
+</section>
+
+<section id="join-panel" class="mode-panel">
+    <form method="post" action="{{ url_for('join_room') }}" class="form-stack narrow-form">
+        <label>
+            <span>초대코드</span>
+            <input class="code-input" name="code" maxlength="6" required value="{{ join_code }}" placeholder="6자리 코드">
+        </label>
+        <label>
+            <span>사용자 이름</span>
+            <input name="name" maxlength="30" required placeholder="방 안에서 표시할 이름">
+        </label>
+        <button class="primary-button" type="submit">입장하기</button>
+    </form>
+</section>
+{% endblock %}

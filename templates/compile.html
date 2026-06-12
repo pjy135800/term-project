@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}결과 취합{% endblock %}
+{% block content %}
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">방장 전용</p>
+        <h1>결과 취합</h1>
+    </div>
+    <a class="text-button" href="{{ url_for('room', room_code=room['code']) }}">대기룸으로</a>
+</section>
+
+<form method="post" action="{{ url_for('finalize_results', room_code=room['code']) }}" class="form-stack">
+    <section class="content-section">
+        <h2>날짜 결과</h2>
+        <div class="ranking-list">
+            {% for group in results["date_groups"] %}
+            <div class="ranking-group">
+                <div class="rank-label">{{ group["rank"] }}순위 <small>{{ group["votes"] }}{% if group["votes"] is number %}표{% endif %}</small></div>
+                <div class="rank-options">
+                    {% for item in group["items"] %}
+                    {% set parts = item.split("|") %}
+                    <label class="result-choice">
+                        <input type="radio" name="selected_slot" value="{{ item }}" required>
+                        <span><b>{{ parts[0] }}</b> {{ parts[1] }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">선택 가능한 날짜 결과가 없습니다.</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-heading">
+            <div>
+                <h2>테마 결과</h2>
+                <p>동률 후보가 많으면 최대 3개를 직접 선택하거나 랜덤 추첨할 수 있습니다.</p>
+            </div>
+        </div>
+        <div class="ranking-list">
+            {% for group in results["theme_groups"] %}
+            <div class="ranking-group">
+                <div class="rank-label">{{ group["rank"] }}순위 <small>{{ group["votes"] }}{% if group["votes"] is number %}표{% endif %}</small></div>
+                <div class="rank-options">
+                    {% for theme in group["items"] %}
+                    <label class="result-choice">
+                        <input type="checkbox" name="selected_themes" value="{{ theme }}"
+                               {% if results["eligible_themes"] | length <= 3 %}checked{% endif %}>
+                        <span>{{ theme }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">선택 가능한 테마 결과가 없습니다.</div>
+            {% endfor %}
+        </div>
+        <div class="selection-mode">
+            <label class="radio-line">
+                <input type="radio" name="theme_selection_mode" value="manual" checked>
+                직접 선택
+            </label>
+            <label class="radio-line random-option">
+                <input type="radio" name="theme_selection_mode" value="random">
+                랜덤 게임으로 최대 3개 뽑기
+            </label>
+        </div>
+    </section>
+
+    <button class="primary-button" type="submit">최종 결과 확정하기</button>
+</form>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{{ room["title"] }} 대기룸{% endblock %}
+{% block content %}
+<section class="room-heading">
+    <div>
+        <p class="eyebrow">대기룸</p>
+        <h1>{{ room["title"] }}</h1>
+        {% if room["description"] %}<p class="room-description">{{ room["description"] }}</p>{% endif %}
+    </div>
+    <div class="invite-block">
+        <span>초대코드</span>
+        <div class="invite-code-row">
+            <strong class="invite-code">{{ room["code"] }}</strong>
+            <button type="button" class="copy-code" data-copy="{{ room['code'] }}" title="초대코드 복사">
+                복사하기
+            </button>
+        </div>
+        <small id="copy-feedback"></small>
+    </div>
+</section>
+
+<div class="status-strip">
+    <div><span>내 역할</span><strong>{{ "방장" if member["role"] == "host" else "조원" }}</strong></div>
+    <div><span>후보 기간</span><strong>{{ room["start_date"] }} ~ {{ room["end_date"] }}</strong></div>
+    <div><span>진행 상태</span><strong id="room-status">{{ "결과 확정" if room["status"] == "finalized" else "의견 수집 중" }}</strong></div>
+</div>
+
+{% if handoff %}
+<section class="result-band">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">최종 결과</p>
+            <h2>{{ handoff["meeting_date"] }} {{ room["final_slot"] }}</h2>
+        </div>
+        <a class="secondary-button" href="{{ url_for('room_handoff', room_code=room['code']) }}" target="_blank">전달 JSON 열기</a>
+    </div>
+    <div class="theme-result-list">
+        {% for theme in handoff["themes"] %}
+        <span><b>{{ theme["rank"] }}순위</b> {{ theme["name"] }}</span>
+        {% endfor %}
+    </div>
+    <pre class="json-preview">{{ handoff | tojson(indent=2) }}</pre>
+</section>
+{% elif member["role"] != "host" and all_submitted %}
+<div class="waiting-message">모든 의견이 모였습니다. 방장이 결과를 취합하는 중입니다.</div>
+{% endif %}
+
+<section class="content-section">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">참여 현황</p>
+            <h2>입장 및 제출 상태</h2>
+        </div>
+        <a class="primary-button compact" href="{{ url_for('survey', room_code=room['code']) }}">
+            {{ "의견 수정하기" if submission and submission["submitted"] else "설문조사 제출하기" }}
+        </a>
+    </div>
+
+    <div class="member-table" id="member-table" data-status-url="{{ url_for('room_status', room_code=room['code']) }}">
+        <div class="member-row member-head">
+            <span>이름</span><span>역할</span><span>의견 상태</span>
+        </div>
+        {% for item in members %}
+        <div class="member-row" data-member-id="{{ item['id'] }}">
+            <strong>{{ item["name"] }}</strong>
+            <span>{{ "방장" if item["role"] == "host" else "조원" }}</span>
+            <span class="submission-state {{ 'done' if item['submitted'] else 'pending' }}">
+                {{ "제출 완료" if item["submitted"] else "작성 전" }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+{% if member["role"] == "host" %}
+<section class="content-section host-section">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">방장 전용</p>
+            <h2>투표 방식 설정</h2>
+        </div>
+    </div>
+    <form method="post" action="{{ url_for('host_settings', room_code=room['code']) }}" class="form-stack">
+        <fieldset>
+            <legend>날짜</legend>
+            <label class="radio-line">
+                <input type="radio" name="date_mode" value="vote" {% if not date_override %}checked{% endif %}>
+                조원 투표 사용
+            </label>
+            <label class="radio-line">
+                <input type="radio" name="date_mode" value="fixed" {% if date_override %}checked{% endif %}>
+                이미 정했어요
+            </label>
+            <div class="field-grid two indent-fields">
+                <label>
+                    <span>확정 날짜</span>
+                    <input type="date" name="fixed_date" min="{{ room['start_date'] }}" max="{{ room['end_date'] }}"
+                           value="{{ date_override['date'] if date_override else '' }}">
+                </label>
+                <label>
+                    <span>시간대</span>
+                    <select name="fixed_slot">
+                        {% for slot in ["아침", "점심", "저녁"] %}
+                        <option value="{{ slot }}" {% if date_override and date_override["slot"] == slot %}selected{% endif %}>{{ slot }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>테마</legend>
+            <label class="radio-line">
+                <input type="radio" name="theme_mode" value="vote" {% if not theme_override %}checked{% endif %}>
+                조원 투표 사용
+            </label>
+            <label class="radio-line">
+                <input type="radio" name="theme_mode" value="fixed" {% if theme_override %}checked{% endif %}>
+                이미 정했어요
+            </label>
+            <label class="indent-fields">
+                <span>확정 테마 (쉼표로 구분, 최대 3개)</span>
+                <input name="fixed_themes" value="{{ theme_override | join(', ') }}" placeholder="예: 방탈출카페, 맛집, 영화관">
+            </label>
+        </fieldset>
+        <button class="secondary-button" type="submit">방장 설정 저장</button>
+    </form>
+</section>
+
+<section class="host-action-bar">
+    <div>
+        <strong id="submit-summary">{{ members | selectattr("submitted") | list | length }} / {{ members | length }}명 제출</strong>
+        <span>현재 입장 인원이 모두 제출하면 결과를 취합할 수 있습니다. 혼자 시연하는 경우 1/1에서도 가능합니다.</span>
+    </div>
+    <a id="compile-button"
+       class="primary-button {% if not all_submitted %}disabled{% endif %}"
+       href="{{ url_for('compile_results', room_code=room['code']) if all_submitted else '#' }}">
+       결과 취합 시작하기
+    </a>
+</section>
+{% endif %}
+
+{% if member["role"] != "host" %}
+<form method="post" action="{{ url_for('leave_room', room_code=room['code']) }}" class="leave-form">
+    <button class="text-button danger" type="submit">방 나가기</button>
+</form>
+{% endif %}
+{% endblock %}

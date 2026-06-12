@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ member["name"] }} 의견 입력{% endblock %}
+{% block content %}
+<section class="section-heading survey-heading">
+    <div>
+        <p class="eyebrow">{{ member["name"] }}</p>
+        <h1>약속 정보 입력</h1>
+    </div>
+    <a class="text-button" href="{{ url_for('room', room_code=room['code']) }}">대기룸으로</a>
+</section>
+
+<form method="post" action="{{ url_for('save_survey', room_code=room['code']) }}" class="form-stack survey-form">
+    <section class="content-section">
+        <h2>출발 장소</h2>
+        <label>
+            <span>도로명 주소, 지번 주소 또는 역 이름</span>
+            <input name="address" required value="{{ address_value }}" placeholder="예: 홍대입구역">
+        </label>
+    </section>
+
+    <section class="content-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">O / X 선택</p>
+                <h2>가능한 날짜와 시간대</h2>
+            </div>
+        </div>
+        {% if date_override %}
+        <div class="override-notice">방장이 {{ date_override["date"] }} {{ date_override["slot"] }}으로 확정했습니다.</div>
+        {% else %}
+        <p class="selection-guide">월별 목록을 펼쳐 가능한 시간만 O로 선택하세요. 접어도 선택 내용은 유지됩니다.</p>
+        <div class="date-month-groups">
+            {% for month in date_groups %}
+            {% set month_selected = namespace(count=0) %}
+            {% for day in month["dates"] %}
+                {% for slot in time_slots %}
+                    {% if day["value"] ~ "|" ~ slot in selected_dates %}
+                        {% set month_selected.count = month_selected.count + 1 %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            <details class="date-month" {% if loop.first or month_selected.count %}open{% endif %}>
+                <summary>
+                    <strong>{{ month["label"] }}</strong>
+                    <span>{{ month["dates"] | length }}일 · <b class="month-selected-count">{{ month_selected.count }}</b>개 선택</span>
+                </summary>
+                <div class="date-choice-table">
+                    <div class="date-choice-row date-choice-head">
+                        <span>날짜</span>
+                        {% for slot in time_slots %}<span>{{ slot }}</span>{% endfor %}
+                    </div>
+                    {% for day in month["dates"] %}
+                    <div class="date-choice-row">
+                        <strong>{{ day["label"] }} ({{ day["weekday"] }})</strong>
+                        {% for slot in time_slots %}
+                        {% set value = day["value"] ~ "|" ~ slot %}
+                        <label class="ox-toggle">
+                            <input type="checkbox" name="date_choices" value="{{ value }}" {% if value in selected_dates %}checked{% endif %}>
+                            <span data-on="O" data-off="X"></span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="content-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">복수 선택 · 최대 {{ max_theme_choices }}개</p>
+                <h2>원하는 테마</h2>
+            </div>
+            <strong class="theme-counter"><span id="theme-selected-count">0</span> / {{ max_theme_choices }}</strong>
+        </div>
+        {% if theme_override %}
+        <div class="override-notice">방장이 {{ theme_override | join(", ") }} 테마로 확정했습니다.</div>
+        {% else %}
+            {% for category, themes in theme_data.items() %}
+            <details class="theme-group" {% if loop.first %}open{% endif %}>
+                <summary>{{ category }}</summary>
+                <div class="theme-options">
+                    {% for theme in themes %}
+                    <label class="theme-check">
+                        <input type="checkbox" name="themes" value="{{ theme }}" {% if theme in selected_themes %}checked{% endif %}>
+                        <span>{{ theme }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endfor %}
+            <label>
+                <span>직접 입력 (쉼표로 구분, 위 선택과 합쳐 최대 {{ max_theme_choices }}개)</span>
+                <input id="custom-themes" name="custom_themes" value="{{ custom_theme_text }}" placeholder="예: 파인다이닝, 계곡">
+            </label>
+        {% endif %}
+    </section>
+
+    <button class="primary-button sticky-submit" type="submit">최종 제출하기</button>
+</form>
+{% endblock %}
