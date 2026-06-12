@@ -464,7 +464,7 @@ def build_room_results(room_code: str) -> dict[str, Any]:
 def build_handoff_payload(room_code: str) -> dict[str, Any] | None:
     with connect_db() as db:
         room = execute(db, "SELECT * FROM rooms WHERE code = ?", (room_code,)).fetchone()
-        if not room or room["status"] != "finalized" or not room["final_date"]:
+        if not room or room["status"] != "finalized":
             return None
         users = execute(
             db,
@@ -479,8 +479,21 @@ def build_handoff_payload(room_code: str) -> dict[str, Any] | None:
         ).fetchall()
 
     themes = parse_json(room["final_themes_json"], [])
+    date_groups = build_room_results(room_code)["date_groups"]
+    date_candidates = [
+        {
+            "date": item.split("|", 1)[0],
+            "time_slot": item.split("|", 1)[1],
+            "rank": group["rank"],
+            "votes": group["votes"] if isinstance(group["votes"], int) else None,
+        }
+        for group in date_groups
+        for item in group["items"]
+        if "|" in item
+    ]
     return {
-        "meeting_date": room["final_date"],
+        "meeting_date": room["final_date"] or None,
+        "date_candidates": date_candidates,
         "themes": [{"name": theme, "rank": index} for index, theme in enumerate(themes, start=1)],
         "users": [{"name": row["name"], "address": row["address"]} for row in users],
     }
@@ -825,7 +838,7 @@ def finalize_results(room_code: str, room: Any, member: Any):
     if final_date:
         flash("최종 결과를 확정했습니다. 팀원 2 전달용 JSON도 생성되었습니다.", "success")
     else:
-        flash("테마 결과를 확정했습니다. 날짜는 후보 결과만 확인하는 미정 상태로 저장했습니다.", "success")
+        flash("테마 결과를 확정했습니다. 날짜는 미정 값으로 팀원 2에게 전달됩니다.", "success")
     return redirect(url_for("room", room_code=room_code))
 
 

@@ -73,7 +73,10 @@ GET /handoff?room_code=초대코드
 
 ```json
 {
-  "meeting_date": "YYYY-MM-DD",
+  "meeting_date": "YYYY-MM-DD 또는 null",
+  "date_candidates": [
+    {"date": "YYYY-MM-DD", "time_slot": "아침/점심/저녁", "rank": 1, "votes": 2}
+  ],
   "themes": [
     {"name": "테마명", "rank": 1}
   ],
@@ -82,5 +85,8 @@ GET /handoff?room_code=초대코드
   ]
 }
 ```
+
+날짜를 확정하지 않은 경우에도 JSON이 생성된다. `meeting_date`는 `null`로 전달하고,
+투표로 나온 날짜 후보들은 `date_candidates`에 순위, 시간대, 득표수와 함께 전달한다.
 
 인터넷의 서로 다른 장소에서 접속하려면 Render 같은 외부 서버에 배포해야 한다. 로컬 실행 주소는 같은 네트워크 안에서만 사용할 수 있다.

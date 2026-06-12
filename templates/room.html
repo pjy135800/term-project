@@ -66,7 +66,7 @@
         </section>
         {% endfor %}
     </div>
-    <p class="handoff-pending">팀원 2 전달 JSON은 최종 날짜를 선택한 뒤 생성됩니다.</p>
+    <p class="handoff-pending">날짜 미정 상태와 함께 위 날짜 후보들의 순위·시간대·득표수가 팀원 2에게 전달됩니다.</p>
     {% endif %}
     {% if handoff %}
     <pre class="json-preview">{{ handoff | tojson(indent=2) }}</pre>
