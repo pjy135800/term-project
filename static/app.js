@@ -105,6 +105,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (data.status === "finalized" && !document.querySelector(".result-band")) {
                     window.location.reload();
                 }
+
+                const recommendationAction = document.querySelector(".recommendation-action");
+                const nextRecommendationStatus = data.recommendation?.status || "pending";
+                if (
+                    recommendationAction &&
+                    recommendationAction.dataset.recommendationStatus !== nextRecommendationStatus
+                ) {
+                    window.location.reload();
+                }
             } catch (_error) {
                 // 다음 주기에서 다시 시도한다.
             }

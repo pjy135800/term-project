@@ -14,6 +14,8 @@ services:
         fromDatabase:
           name: team-meeting-db
           property: connectionString
+      - key: RECOMMENDER_URL
+        value: http://64.110.80.116:8501
 
 databases:
   - name: team-meeting-db

@@ -71,6 +71,35 @@
     {% if handoff %}
     <pre class="json-preview">{{ handoff | tojson(indent=2) }}</pre>
     {% endif %}
+
+    <div class="recommendation-action" data-recommendation-status="{{ recommendation['status'] }}">
+        {% if recommendation["status"] == "completed" %}
+        <a class="primary-button"
+           href="{{ recommender_url }}/?room_code={{ room['code'] }}"
+           target="_blank">최종 장소 추천 결과 보기</a>
+        {% elif recommendation["status"] == "running" %}
+        <div class="waiting-message">방장이 최종 장소 추천을 계산하고 있습니다.</div>
+        {% elif recommendation["status"] == "error" %}
+            {% if member["role"] == "host" %}
+            <p class="recommendation-error">{{ recommendation["error"] }}</p>
+            <form method="post" action="{{ url_for('start_recommendation', room_code=room['code']) }}">
+                <button class="primary-button" type="submit">최종 장소 추천 다시 실행</button>
+            </form>
+            {% else %}
+            <div class="waiting-message">장소 추천을 다시 준비하고 있습니다.</div>
+            {% endif %}
+        {% elif member["role"] == "host" %}
+            {% if final_summary["final_date"] %}
+            <form method="post" action="{{ url_for('start_recommendation', room_code=room['code']) }}">
+                <button class="primary-button" type="submit">최종 장소 추천 실행</button>
+            </form>
+            {% else %}
+            <p class="recommendation-error">최종 날짜를 선택해야 장소 추천을 실행할 수 있습니다.</p>
+            {% endif %}
+        {% else %}
+        <div class="waiting-message">방장이 최종 장소 추천을 실행하면 결과가 이 화면에 표시됩니다.</div>
+        {% endif %}
+    </div>
 </section>
 {% elif member["role"] != "host" and all_submitted %}
 <div class="waiting-message">모든 의견이 모였습니다. 방장이 결과를 취합하는 중입니다.</div>

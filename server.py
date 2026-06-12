@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlencode
 
 from flask import (
     Flask,
@@ -24,12 +25,14 @@ from flask import (
     session,
     url_for,
 )
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = Path(os.getenv("TEAM_DATABASE_PATH", BASE_DIR / "team_rooms.db"))
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+RECOMMENDER_URL = os.getenv("RECOMMENDER_URL", "http://localhost:8501").rstrip("/")
 TIME_SLOTS = ("아침", "점심", "저녁")
 MAX_DATE_RANGE_DAYS = 31
 MAX_THEME_CHOICES = 5
@@ -172,6 +175,16 @@ def init_db() -> None:
                 FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS recommendations (
+                room_code TEXT PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'pending',
+                result_json TEXT,
+                error_message TEXT,
+                started_at TEXT,
+                completed_at TEXT,
+                FOREIGN KEY(room_code) REFERENCES rooms(code) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_members_room ON members(room_code);
     """
     postgres_schema = sqlite_schema.replace(
@@ -192,6 +205,61 @@ init_db()
 
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def recommendation_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(app.secret_key, salt="meeting-recommendation")
+
+
+def recommendation_record(room_code: str) -> dict[str, Any]:
+    with connect_db() as db:
+        row = execute(
+            db,
+            "SELECT status, result_json, error_message, started_at, completed_at FROM recommendations WHERE room_code = ?",
+            (room_code,),
+        ).fetchone()
+    if not row:
+        return {
+            "status": "pending",
+            "result": None,
+            "error": None,
+            "started_at": None,
+            "completed_at": None,
+        }
+    return {
+        "status": row["status"],
+        "result": parse_json(row["result_json"], None),
+        "error": row["error_message"],
+        "started_at": row["started_at"],
+        "completed_at": row["completed_at"],
+    }
+
+
+def save_recommendation_state(
+    room_code: str,
+    status: str,
+    *,
+    result: dict[str, Any] | None = None,
+    error: str | None = None,
+) -> None:
+    started_at = now_iso() if status == "running" else None
+    completed_at = now_iso() if status in {"completed", "error"} else None
+    result_json = json.dumps(result, ensure_ascii=False) if result is not None else None
+    with connect_db() as db:
+        execute(
+            db,
+            """
+            INSERT INTO recommendations(room_code, status, result_json, error_message, started_at, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(room_code) DO UPDATE SET
+                status = excluded.status,
+                result_json = excluded.result_json,
+                error_message = excluded.error_message,
+                started_at = COALESCE(excluded.started_at, recommendations.started_at),
+                completed_at = excluded.completed_at
+            """,
+            (room_code, status, result_json, error, started_at, completed_at),
+        )
 
 
 def parse_json(raw: str | None, default: Any) -> Any:
@@ -608,6 +676,8 @@ def room(room_code: str, room: Any, member: Any):
         theme_override=parse_json(room["theme_override_json"], []),
         handoff=build_handoff_payload(room_code),
         final_summary=final_summary,
+        recommendation=recommendation_record(room_code),
+        recommender_url=RECOMMENDER_URL,
     )
 
 
@@ -834,12 +904,34 @@ def finalize_results(room_code: str, room: Any, member: Any):
             """,
             (final_date, final_slot, json.dumps(final_themes, ensure_ascii=False), room_code),
         )
+        execute(db, "DELETE FROM recommendations WHERE room_code = ?", (room_code,))
 
     if final_date:
         flash("최종 결과를 확정했습니다. 팀원 2 전달용 JSON도 생성되었습니다.", "success")
     else:
         flash("테마 결과를 확정했습니다. 날짜는 미정 값으로 팀원 2에게 전달됩니다.", "success")
     return redirect(url_for("room", room_code=room_code))
+
+
+@app.post("/rooms/<room_code>/recommendation/start")
+@host_required
+def start_recommendation(room_code: str, room: Any, member: Any):
+    if room["status"] != "finalized":
+        flash("날짜와 테마를 먼저 최종 확정해 주세요.", "warning")
+        return redirect(url_for("room", room_code=room_code))
+    if not room["final_date"]:
+        flash("방장이 최종 날짜를 선택한 뒤 장소 추천을 실행할 수 있습니다.", "warning")
+        return redirect(url_for("room", room_code=room_code))
+
+    payload = build_handoff_payload(room_code)
+    if not payload or not payload.get("users") or not payload.get("themes"):
+        flash("장소 추천에 필요한 참여자 또는 테마 정보가 부족합니다.", "error")
+        return redirect(url_for("room", room_code=room_code))
+
+    save_recommendation_state(room_code, "running")
+    token = recommendation_serializer().dumps({"room_code": room_code})
+    query = urlencode({"room_code": room_code, "run_token": token})
+    return redirect(f"{RECOMMENDER_URL}/?{query}")
 
 
 @app.get("/api/rooms/<room_code>/status")
@@ -855,6 +947,7 @@ def room_status(room_code: str, room: Any, member: Any):
             "current_member_id": member["id"],
             "current_role": member["role"],
             "handoff": build_handoff_payload(room_code),
+            "recommendation": recommendation_record(room_code),
         }
     )
 
@@ -873,6 +966,44 @@ def compatible_handoff():
     if not room_code:
         return jsonify({"error": "room_code 쿼리 값이 필요합니다."}), 400
     return room_handoff(room_code)
+
+
+@app.get("/api/rooms/<room_code>/recommendation")
+def recommendation_result(room_code: str):
+    room_code = clean_text(room_code, 6).upper()
+    with connect_db() as db:
+        room = execute(db, "SELECT status FROM rooms WHERE code = ?", (room_code,)).fetchone()
+    if not room:
+        return jsonify({"error": "방을 찾을 수 없습니다."}), 404
+    return jsonify(recommendation_record(room_code))
+
+
+@app.post("/api/rooms/<room_code>/recommendation")
+def save_recommendation_result(room_code: str):
+    room_code = clean_text(room_code, 6).upper()
+    body = request.get_json(silent=True) or {}
+    token = clean_text(body.get("run_token"), 1000)
+    try:
+        signed = recommendation_serializer().loads(token, max_age=7200)
+    except SignatureExpired:
+        return jsonify({"error": "추천 실행 토큰이 만료되었습니다."}), 403
+    except BadSignature:
+        return jsonify({"error": "유효하지 않은 추천 실행 토큰입니다."}), 403
+    if signed.get("room_code") != room_code:
+        return jsonify({"error": "추천 실행 방 정보가 일치하지 않습니다."}), 403
+
+    status = body.get("status")
+    if status == "completed" and isinstance(body.get("result"), dict):
+        save_recommendation_state(room_code, "completed", result=body["result"])
+    elif status == "error":
+        save_recommendation_state(
+            room_code,
+            "error",
+            error=clean_text(body.get("error"), 500) or "추천 실행 중 오류가 발생했습니다.",
+        )
+    else:
+        return jsonify({"error": "저장할 추천 결과 형식이 올바르지 않습니다."}), 400
+    return jsonify({"status": "ok"})
 
 
 @app.post("/rooms/<room_code>/leave")
