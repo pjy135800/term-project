@@ -462,6 +462,13 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
     font-size: 12px;
 }
 .handoff-pending { margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.recommendation-action {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #cfe2da;
+}
+.recommendation-action form { margin: 0; }
+.recommendation-error { color: var(--danger); font-weight: 700; }
 
 @keyframes reel-pulse {
     from { transform: translateY(-2px); background: #fff; }
