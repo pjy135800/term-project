@@ -40,9 +40,6 @@
             <p>날짜는 확정하지 않고 투표 후보 결과만 저장했습니다.</p>
             {% endif %}
         </div>
-        {% if handoff %}
-        <a class="secondary-button" href="{{ url_for('room_handoff', room_code=room['code']) }}" target="_blank">전달 JSON 열기</a>
-        {% endif %}
     </div>
     <div class="theme-result-list">
         {% for theme in final_summary["themes"] %}
@@ -66,10 +63,7 @@
         </section>
         {% endfor %}
     </div>
-    <p class="handoff-pending">날짜 미정 상태와 함께 위 날짜 후보들의 순위·시간대·득표수가 팀원 2에게 전달됩니다.</p>
-    {% endif %}
-    {% if handoff %}
-    <pre class="json-preview">{{ handoff | tojson(indent=2) }}</pre>
+    <p class="handoff-pending">날짜가 확정되면 최종 장소 추천을 실행할 수 있습니다.</p>
     {% endif %}
 
     <div class="recommendation-action" data-recommendation-status="{{ recommendation['status'] }}">

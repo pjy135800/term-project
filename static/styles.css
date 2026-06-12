@@ -1,14 +1,14 @@
 :root {
-    --ink: #182230;
-    --muted: #687386;
-    --line: #dce1e8;
+    --ink: #241820;
+    --muted: #74656e;
+    --line: #eadde3;
     --surface: #ffffff;
-    --canvas: #f4f6f8;
+    --canvas: #fff8fb;
     --primary: #ff3478;
     --primary-dark: #e91f64;
-    --accent: #6c4df6;
+    --accent: #ff7aa8;
     --danger: #c33c54;
-    --blue: #2c65b1;
+    --blue: #d92768;
     --radius: 8px;
 }
 
@@ -153,8 +153,8 @@ input, textarea, select {
     color: var(--ink);
 }
 input:focus, textarea:focus, select:focus {
-    outline: 3px solid rgba(44, 101, 177, 0.16);
-    border-color: var(--blue);
+    outline: 3px solid rgba(255, 52, 120, 0.14);
+    border-color: var(--primary);
 }
 .code-input { text-transform: uppercase; font-family: Consolas, monospace; font-size: 22px; }
 fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); }
@@ -176,7 +176,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 }
 .primary-button { color: #fff; background: var(--primary); }
 .primary-button:hover { background: var(--primary-dark); }
-.secondary-button { color: var(--ink); background: #eef1f4; border: 1px solid #cbd2dc; }
+.secondary-button { color: var(--primary-dark); background: #fff0f5; border: 1px solid #ffc1d6; }
 .compact { width: auto; min-height: 40px; padding: 9px 14px; }
 .disabled { pointer-events: none; opacity: 0.45; }
 .text-button { border: 0; background: transparent; color: var(--blue); text-decoration: none; cursor: pointer; }
@@ -221,18 +221,17 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
     padding: 26px 0;
     border-top: 1px solid var(--line);
 }
-.result-band { border: 1px solid #b9d7cc; border-left: 5px solid var(--primary); padding: 22px; background: #f5fbf8; }
+.result-band { border: 1px solid #f4c7d8; border-left: 5px solid var(--primary); padding: 22px; background: #fff3f7; }
 .theme-result-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
-.theme-result-list span { padding: 8px 10px; background: #fff; border: 1px solid #cfe2da; border-radius: 6px; }
-.json-preview { overflow: auto; margin: 16px 0 0; padding: 14px; background: #19212c; color: #eef4f8; border-radius: var(--radius); }
+.theme-result-list span { padding: 8px 10px; background: #fff; border: 1px solid #f2bfd2; border-radius: 6px; }
 .waiting-message, .override-notice, .flash {
     border-radius: var(--radius);
     padding: 14px 16px;
     margin: 16px 0;
 }
-.waiting-message { background: #fff5e5; border-left: 4px solid var(--accent); }
+.waiting-message { background: #fff0f5; border-left: 4px solid var(--primary); }
 .override-notice { background: #edf4fc; border-left: 4px solid var(--blue); }
-.flash-success { background: #e8f6ef; color: #0d684d; }
+.flash-success { background: #fff0f5; color: #b81450; }
 .flash-error { background: #fdecef; color: #9f2740; }
 .flash-warning { background: #fff5e5; color: #81530f; }
 
@@ -247,7 +246,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 }
 .member-head { color: var(--muted); font-size: 13px; }
 .submission-state { width: fit-content; padding: 5px 8px; border-radius: 6px; font-size: 13px; font-weight: 700; }
-.submission-state.done { color: #0d684d; background: #e8f6ef; }
+.submission-state.done { color: #b81450; background: #fff0f5; }
 .submission-state.pending { color: #81530f; background: #fff5e5; }
 
 .host-section { margin-top: 18px; }
@@ -432,7 +431,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
     margin-top: 12px;
 }
 .date-rank-group {
-    border: 1px solid #cfe2da;
+    border: 1px solid #f2bfd2;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.68);
     overflow: hidden;
@@ -443,7 +442,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
     justify-content: space-between;
     gap: 12px;
     padding: 9px 12px;
-    border-bottom: 1px solid #cfe2da;
+    border-bottom: 1px solid #f2bfd2;
     background: #fff;
 }
 .date-rank-heading strong { color: var(--primary); font-size: 16px; }
@@ -456,7 +455,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 }
 .date-rank-items span {
     padding: 6px 8px;
-    border: 1px solid #cfe2da;
+    border: 1px solid #f2bfd2;
     border-radius: 5px;
     background: #fff;
     font-size: 12px;
@@ -465,7 +464,7 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 .recommendation-action {
     margin-top: 20px;
     padding-top: 18px;
-    border-top: 1px solid #cfe2da;
+    border-top: 1px solid #f2bfd2;
 }
 .recommendation-action form { margin: 0; }
 .recommendation-error { color: var(--danger); font-weight: 700; }
