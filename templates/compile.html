@@ -29,7 +29,11 @@
                     {% for item in group["items"] %}
                     <label class="result-choice date-result-choice">
                         <input type="radio" name="selected_date" value="{{ item }}">
-                        <span><b>{{ item }}</b></span>
+                        <span>
+                            <b>{{ item }}</b>
+                            {% set votes = results["date_slot_votes"].get(item, {}) %}
+                            <small class="date-slot-votes">아침 {{ votes.get("아침", 0) }}표 · 점심 {{ votes.get("점심", 0) }}표 · 저녁 {{ votes.get("저녁", 0) }}표</small>
+                        </span>
                     </label>
                     {% endfor %}
                 </div>
@@ -37,23 +41,6 @@
             {% else %}
             <div class="empty-state">선택 가능한 날짜 결과가 없습니다.</div>
             {% endfor %}
-        </div>
-        <div class="time-result-board">
-            <div>
-                <strong>시간대 투표 결과</strong>
-                <p>최종 날짜와 함께 사용할 시간대를 선택하세요.</p>
-            </div>
-            <div class="time-result-options">
-                {% for item in results["time_slot_counts"] %}
-                <label class="result-choice">
-                    <input type="radio" name="selected_time_slot" value="{{ item['slot'] }}">
-                    <span>
-                        <b>{{ item["slot"] }}</b>
-                        <small>{{ item["votes"] }}{% if item["votes"] is number %}표{% endif %}</small>
-                    </span>
-                </label>
-                {% endfor %}
-            </div>
         </div>
     </section>
 

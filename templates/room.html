@@ -34,7 +34,7 @@
         <div>
             <p class="eyebrow">최종 결과</p>
             {% if final_summary["final_date"] %}
-            <h2>{{ final_summary["final_date"] }} {{ final_summary["final_slot"] }}</h2>
+            <h2>{{ final_summary["final_date"] }}</h2>
             {% else %}
             <h2>날짜 미정</h2>
             <p>날짜는 확정하지 않고 투표 후보 결과만 저장했습니다.</p>
@@ -56,7 +56,8 @@
             </div>
             <div class="date-rank-items">
             {% for item in group["items"] %}
-                <span><b>{{ item }}</b></span>
+                {% set votes = final_summary["date_slot_votes"].get(item, {}) %}
+                <span><b>{{ item }}</b><small>아침 {{ votes.get("아침", 0) }}표 · 점심 {{ votes.get("점심", 0) }}표 · 저녁 {{ votes.get("저녁", 0) }}표</small></span>
             {% endfor %}
             </div>
         </section>
@@ -64,12 +65,15 @@
     </div>
     <p class="handoff-pending">날짜가 확정되면 최종 장소 추천을 실행할 수 있습니다.</p>
     {% endif %}
+    {% if final_summary["final_date"] %}
+    {% set selected_votes = final_summary["date_slot_votes"].get(final_summary["final_date"], {}) %}
     <div class="time-vote-summary">
         <strong>시간대 투표</strong>
-        {% for item in final_summary["time_slot_counts"] %}
-        <span>{{ item["slot"] }} <b>{{ item["votes"] }}{% if item["votes"] is number %}표{% endif %}</b></span>
+        {% for slot in ["아침", "점심", "저녁"] %}
+        <span>{{ slot }} <b>{{ selected_votes.get(slot, 0) }}표</b></span>
         {% endfor %}
     </div>
+    {% endif %}
 
     <div class="recommendation-action" data-recommendation-status="{{ recommendation['status'] }}">
         {% if recommendation["status"] == "completed" %}
@@ -165,19 +169,11 @@
                 <input type="radio" name="date_mode" value="fixed" {% if date_override %}checked{% endif %}>
                 이미 정했어요
             </label>
-            <div class="field-grid two indent-fields">
+            <div class="indent-fields">
                 <label>
                     <span>확정 날짜</span>
                     <input type="date" name="fixed_date" min="{{ room['start_date'] }}" max="{{ room['end_date'] }}"
                            value="{{ date_override['date'] if date_override else '' }}">
-                </label>
-                <label>
-                    <span>시간대</span>
-                    <select name="fixed_slot">
-                        {% for slot in ["아침", "점심", "저녁"] %}
-                        <option value="{{ slot }}" {% if date_override and date_override["slot"] == slot %}selected{% endif %}>{{ slot }}</option>
-                        {% endfor %}
-                    </select>
                 </label>
             </div>
         </fieldset>

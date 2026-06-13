@@ -22,53 +22,49 @@
         <div class="section-heading">
             <div>
                 <p class="eyebrow">복수 선택</p>
-                <h2>가능한 날짜</h2>
+                <h2>가능한 날짜와 시간대</h2>
             </div>
         </div>
         {% if date_override %}
-        <div class="override-notice">방장이 {{ date_override["date"] }} {{ date_override["slot"] }}으로 확정했습니다.</div>
+        <div class="override-notice">방장이 {{ date_override["date"] }}로 확정했습니다.</div>
         {% else %}
-        <p class="selection-guide">만날 수 있는 날짜를 O로 선택하세요. 시간대는 아래에서 별도로 선택합니다.</p>
+        <p class="selection-guide">날짜마다 가능한 시간대를 모두 선택하세요.</p>
         <div class="date-month-groups">
             {% for month in date_groups %}
             {% set month_selected = namespace(count=0) %}
             {% for day in month["dates"] %}
-                {% if day["value"] in selected_dates %}
-                    {% set month_selected.count = month_selected.count + 1 %}
-                {% endif %}
+                {% for slot in time_slots %}
+                    {% if day["value"] ~ "|" ~ slot in selected_dates %}
+                        {% set month_selected.count = month_selected.count + 1 %}
+                    {% endif %}
+                {% endfor %}
             {% endfor %}
             <details class="date-month" {% if month_selected.count %}open{% endif %}>
                 <summary>
                     <strong>{{ month["label"] }}</strong>
-                    <span>{{ month["dates"] | length }}일 · <b class="month-selected-count">{{ month_selected.count }}</b>일 선택</span>
+                    <span>{{ month["dates"] | length }}일 · <b class="month-selected-count">{{ month_selected.count }}</b>개 선택</span>
                 </summary>
-                <div class="date-grid">
+                <div class="date-slot-table">
+                    <div class="date-slot-row date-slot-head">
+                        <span>날짜</span>
+                        {% for slot in time_slots %}<span>{{ slot }}</span>{% endfor %}
+                    </div>
                     {% for day in month["dates"] %}
-                    <div class="date-day-choice">
-                        <strong>{{ day["label"] }} ({{ day["weekday"] }})</strong>
-                        <label class="ox-toggle">
-                            <input type="checkbox" name="date_choices" value="{{ day['value'] }}" {% if day["value"] in selected_dates %}checked{% endif %}>
-                            <span data-on="O" data-off="X"></span>
+                    <div class="date-slot-row">
+                        <strong>{{ day["label"] }} <small>{{ day["weekday"] }}</small></strong>
+                        {% for slot in time_slots %}
+                        {% set choice = day["value"] ~ "|" ~ slot %}
+                        <label class="slot-toggle" title="{{ day['label'] }} {{ slot }}">
+                            <input type="checkbox" name="date_choices" value="{{ choice }}" {% if choice in selected_dates %}checked{% endif %}>
+                            <span aria-hidden="true"></span>
+                            <b class="sr-only">{{ slot }}</b>
                         </label>
+                        {% endfor %}
                     </div>
                     {% endfor %}
                 </div>
             </details>
             {% endfor %}
-        </div>
-        <div class="time-choice-section">
-            <div>
-                <strong>가능한 시간대</strong>
-                <p>선택한 날짜들에 공통으로 가능한 시간대를 모두 골라주세요.</p>
-            </div>
-            <div class="time-choice-grid">
-                {% for slot in time_slots %}
-                <label class="theme-check">
-                    <input type="checkbox" name="time_choices" value="{{ slot }}" {% if slot in selected_time_slots %}checked{% endif %}>
-                    <span>{{ slot }}</span>
-                </label>
-                {% endfor %}
-            </div>
         </div>
         {% endif %}
     </section>
@@ -104,7 +100,7 @@
             {% endfor %}
             <label>
                 <span>직접 입력 (쉼표로 구분, 위 선택과 합쳐 최대 {{ max_theme_choices }}개)</span>
-                <input id="custom-themes" name="custom_themes" value="{{ custom_theme_text }}" placeholder="예: 전시회, 놀이공원">
+                <input id="custom-themes" name="custom_themes" value="{{ custom_theme_text }}" placeholder="예: 재즈바, 쿠킹클래스">
             </label>
         {% endif %}
     </section>

@@ -62,11 +62,9 @@ THEME_DATA = {
     "문화/관람": [
         "영화관",
         "공연",
-        "전시회",
         "미술관",
         "박물관",
-        "아쿠아리움",
-        "동물원",
+        "한강공원",
     ],
     "실내 놀거리": [
         "방탈출카페",
@@ -86,19 +84,7 @@ THEME_DATA = {
         "실내클라이밍",
         "스크린야구",
         "스크린골프",
-        "배드민턴",
-        "테니스",
         "롤러스케이트",
-    ],
-    "야외/나들이": [
-        "한강공원",
-        "공원/산책",
-        "피크닉",
-        "놀이공원",
-        "워터파크",
-        "등산",
-        "자전거",
-        "쇼핑몰",
     ],
 }
 
@@ -336,9 +322,9 @@ def dedupe_theme_names(values: list[Any]) -> list[str]:
     return result
 
 
-def submission_availability(submission: Any | None) -> tuple[set[str], set[str]]:
+def submission_date_slots(submission: Any | None) -> set[str]:
     if not submission:
-        return set(), set()
+        return set()
 
     raw_dates = parse_json(submission["date_choices_json"], [])
     try:
@@ -346,22 +332,29 @@ def submission_availability(submission: Any | None) -> tuple[set[str], set[str]]
     except (IndexError, KeyError):
         raw_times = []
 
-    dates: set[str] = set()
-    times: set[str] = {slot for slot in raw_times if slot in TIME_SLOTS}
+    combined: set[str] = set()
+    plain_dates: set[str] = set()
     for value in raw_dates:
         text = clean_text(value, 40)
         if "|" in text:
             day, slot = text.split("|", 1)
-            if slot in TIME_SLOTS:
-                times.add(slot)
         else:
             day = text
+            slot = ""
         try:
             date.fromisoformat(day)
         except ValueError:
             continue
-        dates.add(day)
-    return dates, times
+        if slot in TIME_SLOTS:
+            combined.add(f"{day}|{slot}")
+        else:
+            plain_dates.add(day)
+
+    legacy_times = {slot for slot in raw_times if slot in TIME_SLOTS}
+    for day in plain_dates:
+        for slot in legacy_times:
+            combined.add(f"{day}|{slot}")
+    return combined
 
 
 def generate_room_code() -> str:
@@ -477,7 +470,6 @@ def render_survey_form(
     *,
     address_value: str,
     selected_dates: set[str],
-    selected_time_slots: set[str],
     selected_themes: set[str],
     custom_theme_text: str,
     status_code: int = 200,
@@ -491,7 +483,6 @@ def render_survey_form(
             time_slots=TIME_SLOTS,
             theme_data=THEME_DATA,
             selected_dates=selected_dates,
-            selected_time_slots=selected_time_slots,
             selected_themes=selected_themes,
             custom_theme_text=custom_theme_text,
             address_value=address_value,
@@ -558,25 +549,24 @@ def build_room_results(room_code: str) -> dict[str, Any]:
 
     if date_override:
         date_groups = [{"rank": 1, "votes": "방장 확정", "items": [date_override["date"]]}]
-        time_slot_counts = [
-            {
-                "slot": slot,
-                "votes": "방장 확정" if slot == date_override["slot"] else 0,
-            }
-            for slot in TIME_SLOTS
-        ]
+        date_slot_votes = {
+            date_override["date"]: {slot: 0 for slot in TIME_SLOTS}
+        }
     else:
         date_votes: Counter[str] = Counter()
-        time_votes: Counter[str] = Counter()
+        slot_votes_by_date: dict[str, Counter[str]] = {}
         for submission in submissions:
-            dates, times = submission_availability(submission)
-            date_votes.update(dates)
-            time_votes.update(times)
+            choices = submission_date_slots(submission)
+            selected_days = {choice.split("|", 1)[0] for choice in choices}
+            date_votes.update(selected_days)
+            for choice in choices:
+                day, slot = choice.split("|", 1)
+                slot_votes_by_date.setdefault(day, Counter())[slot] += 1
         date_groups = ranked_groups(date_votes, 3)
-        time_slot_counts = [
-            {"slot": slot, "votes": time_votes.get(slot, 0)}
-            for slot in TIME_SLOTS
-        ]
+        date_slot_votes = {
+            day: {slot: counter.get(slot, 0) for slot in TIME_SLOTS}
+            for day, counter in slot_votes_by_date.items()
+        }
 
     if theme_override:
         normalized_override = dedupe_theme_names(theme_override)
@@ -602,7 +592,7 @@ def build_room_results(room_code: str) -> dict[str, Any]:
         occupied_slots += len(group["items"])
     return {
         "date_groups": date_groups,
-        "time_slot_counts": time_slot_counts,
+        "date_slot_votes": date_slot_votes,
         "theme_groups": theme_groups,
         "eligible_themes": eligible_themes,
         "theme_rank_options": theme_rank_options,
@@ -634,18 +624,23 @@ def build_handoff_payload(room_code: str) -> dict[str, Any] | None:
     date_candidates = [
         {
             "date": item,
-            "time_slot": room["final_slot"] or None,
             "rank": group["rank"],
             "votes": group["votes"] if isinstance(group["votes"], int) else None,
+            "time_slot_votes": results["date_slot_votes"].get(
+                item,
+                {slot: 0 for slot in TIME_SLOTS},
+            ),
         }
         for group in date_groups
         for item in group["items"]
     ]
     return {
         "meeting_date": room["final_date"] or None,
-        "meeting_time_slot": room["final_slot"] or None,
         "date_candidates": date_candidates,
-        "time_slot_votes": results["time_slot_counts"],
+        "time_slot_votes": results["date_slot_votes"].get(
+            room["final_date"],
+            {slot: 0 for slot in TIME_SLOTS},
+        ) if room["final_date"] else {},
         "themes": [{"name": theme, "rank": index} for index, theme in enumerate(themes, start=1)],
         "users": [{"name": row["name"], "address": row["address"]} for row in users],
     }
@@ -746,9 +741,8 @@ def room(room_code: str, room: Any, member: Any):
         results = build_room_results(room_code)
         final_summary = {
             "date_groups": results["date_groups"],
-            "time_slot_counts": results["time_slot_counts"],
+            "date_slot_votes": results["date_slot_votes"],
             "final_date": room["final_date"],
-            "final_slot": room["final_slot"],
             "themes": parse_json(room["final_themes_json"], []),
         }
     return render_template(
@@ -772,14 +766,13 @@ def room(room_code: str, room: Any, member: Any):
 def survey(room_code: str, room: Any, member: Any):
     submission = fetch_submission(member["id"])
     selected_themes = set(parse_json(submission["themes_json"], [])) if submission else set()
-    selected_dates, selected_time_slots = submission_availability(submission)
+    selected_dates = submission_date_slots(submission)
     known_themes = {theme for values in THEME_DATA.values() for theme in values}
     return render_survey_form(
         room,
         member,
         address_value=submission["address"] if submission else "",
         selected_dates=selected_dates,
-        selected_time_slots=selected_time_slots,
         selected_themes=selected_themes,
         custom_theme_text=", ".join(sorted(selected_themes - known_themes)),
     )
@@ -790,19 +783,29 @@ def survey(room_code: str, room: Any, member: Any):
 def save_survey(room_code: str, room: Any, member: Any):
     address = clean_text(request.form.get("address"), 150)
     valid_dates = set(room_dates(room))
-    submitted_dates: set[str] = set()
-    submitted_times = set(request.form.getlist("time_choices"))
+    valid_choices = {
+        f"{day}|{slot}"
+        for day in valid_dates
+        for slot in TIME_SLOTS
+    }
+    date_choices: set[str] = set()
+    plain_dates: set[str] = set()
     for raw_choice in request.form.getlist("date_choices"):
         if "|" in raw_choice:
-            day, slot = raw_choice.split("|", 1)
-            if slot in TIME_SLOTS:
-                submitted_times.add(slot)
+            if raw_choice in valid_choices:
+                date_choices.add(raw_choice)
         else:
-            day = raw_choice
-        if day in valid_dates:
-            submitted_dates.add(day)
-    date_choices = sorted(submitted_dates)
-    time_choices = [slot for slot in TIME_SLOTS if slot in submitted_times]
+            if raw_choice in valid_dates:
+                plain_dates.add(raw_choice)
+
+    # 직전 배포 화면에서 전송한 날짜/공통 시간대 형식도 조합형으로 변환한다.
+    submitted_times = {
+        slot for slot in request.form.getlist("time_choices") if slot in TIME_SLOTS
+    }
+    for day in plain_dates:
+        for slot in submitted_times:
+            date_choices.add(f"{day}|{slot}")
+    date_choices = sorted(date_choices)
 
     known_themes = {theme for values in THEME_DATA.values() for theme in values}
     preset_themes = [clean_text(theme, 50) for theme in request.form.getlist("themes")]
@@ -822,7 +825,6 @@ def save_survey(room_code: str, room: Any, member: Any):
             member,
             address_value=address,
             selected_dates=set(date_choices),
-            selected_time_slots=set(time_choices),
             selected_themes=set(preset_themes),
             custom_theme_text=custom_theme_text,
             status_code=400,
@@ -831,9 +833,7 @@ def save_survey(room_code: str, room: Any, member: Any):
     if not address:
         return invalid_form("팀원 2 코드로 전달할 출발 장소를 입력해 주세요.")
     if not parse_json(room["date_override_json"], None) and not date_choices:
-        return invalid_form("가능한 날짜를 하나 이상 선택해 주세요.")
-    if not parse_json(room["date_override_json"], None) and not time_choices:
-        return invalid_form("가능한 시간대를 하나 이상 선택해 주세요.")
+        return invalid_form("가능한 날짜와 시간대를 하나 이상 선택해 주세요.")
     if not parse_json(room["theme_override_json"], []) and not themes:
         return invalid_form("원하는 테마를 하나 이상 선택하거나 직접 입력해 주세요.")
     if len(themes) > MAX_THEME_CHOICES:
@@ -860,7 +860,7 @@ def save_survey(room_code: str, room: Any, member: Any):
                 member["id"],
                 address,
                 json.dumps(date_choices, ensure_ascii=False),
-                json.dumps(time_choices, ensure_ascii=False),
+                "[]",
                 json.dumps(themes, ensure_ascii=False),
                 now_iso(),
             ),
@@ -885,11 +885,10 @@ def host_settings(room_code: str, room: Any, member: Any):
     date_override_json = None
     if request.form.get("date_mode") == "fixed":
         fixed_date = request.form.get("fixed_date", "")
-        fixed_slot = request.form.get("fixed_slot", "")
-        if fixed_date not in room_dates(room) or fixed_slot not in TIME_SLOTS:
-            flash("방장이 확정할 날짜와 시간대를 올바르게 선택해 주세요.", "error")
+        if fixed_date not in room_dates(room):
+            flash("방장이 확정할 날짜를 올바르게 선택해 주세요.", "error")
             return redirect(url_for("room", room_code=room_code))
-        date_override_json = json.dumps({"date": fixed_date, "slot": fixed_slot}, ensure_ascii=False)
+        date_override_json = json.dumps({"date": fixed_date}, ensure_ascii=False)
 
     theme_override_json = None
     if request.form.get("theme_mode") == "fixed":
@@ -927,13 +926,11 @@ def host_settings(room_code: str, room: Any, member: Any):
         ).fetchall()
         for row in rows:
             has_address = bool(clean_text(row["address"], 150))
-            dates, times = submission_availability(row)
-            has_dates = bool(dates)
-            has_times = bool(times)
+            has_date_slots = bool(submission_date_slots(row))
             has_themes = bool(parse_json(row["themes_json"], []))
             remains_complete = (
                 has_address
-                and (date_override_json is not None or (has_dates and has_times))
+                and (date_override_json is not None or has_date_slots)
                 and (theme_override_json is not None or has_themes)
             )
             execute(
@@ -965,15 +962,8 @@ def finalize_results(room_code: str, room: Any, member: Any):
     results = build_room_results(room_code)
     available_dates = {item for group in results["date_groups"] for item in group["items"]}
     selected_date = request.form.get("selected_date", "").strip()
-    selected_time_slot = request.form.get("selected_time_slot", "").strip()
     if selected_date and selected_date not in available_dates:
         flash("선택한 날짜 결과를 확인할 수 없습니다.", "error")
-        return redirect(url_for("compile_results", room_code=room_code))
-    if selected_date and selected_time_slot not in TIME_SLOTS:
-        flash("최종 시간대를 하나 선택해 주세요.", "error")
-        return redirect(url_for("compile_results", room_code=room_code))
-    if selected_time_slot and not selected_date:
-        flash("시간대를 확정하려면 날짜도 함께 선택해 주세요.", "error")
         return redirect(url_for("compile_results", room_code=room_code))
 
     eligible_themes = results["eligible_themes"]
@@ -1016,7 +1006,7 @@ def finalize_results(room_code: str, room: Any, member: Any):
         return redirect(url_for("compile_results", room_code=room_code))
 
     final_date = selected_date or None
-    final_slot = selected_time_slot or None
+    final_slot = None
     with connect_db() as db:
         execute(
             db,
