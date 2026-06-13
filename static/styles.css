@@ -300,7 +300,14 @@ fieldset { margin: 0; padding: 18px; border: 1px solid var(--line); border-radiu
 .date-slot-row > strong small { margin-left: 5px; color: var(--muted); font-weight: 600; }
 .date-slot-head { min-height: 42px; background: #f6f7f8; color: var(--muted); font-size: 12px; font-weight: 800; }
 .slot-toggle { display: flex; justify-content: center; margin: 0; }
-.slot-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.slot-toggle input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+}
 .slot-toggle span {
     width: 32px;
     height: 32px;
