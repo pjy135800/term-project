@@ -21,49 +21,54 @@
     <section class="content-section">
         <div class="section-heading">
             <div>
-                <p class="eyebrow">O / X 선택</p>
-                <h2>가능한 날짜와 시간대</h2>
+                <p class="eyebrow">복수 선택</p>
+                <h2>가능한 날짜</h2>
             </div>
         </div>
         {% if date_override %}
         <div class="override-notice">방장이 {{ date_override["date"] }} {{ date_override["slot"] }}으로 확정했습니다.</div>
         {% else %}
-        <p class="selection-guide">월별 목록을 펼쳐 가능한 시간만 O로 선택하세요. 접어도 선택 내용은 유지됩니다.</p>
+        <p class="selection-guide">만날 수 있는 날짜를 O로 선택하세요. 시간대는 아래에서 별도로 선택합니다.</p>
         <div class="date-month-groups">
             {% for month in date_groups %}
             {% set month_selected = namespace(count=0) %}
             {% for day in month["dates"] %}
-                {% for slot in time_slots %}
-                    {% if day["value"] ~ "|" ~ slot in selected_dates %}
-                        {% set month_selected.count = month_selected.count + 1 %}
-                    {% endif %}
-                {% endfor %}
+                {% if day["value"] in selected_dates %}
+                    {% set month_selected.count = month_selected.count + 1 %}
+                {% endif %}
             {% endfor %}
-            <details class="date-month" {% if loop.first or month_selected.count %}open{% endif %}>
+            <details class="date-month" {% if month_selected.count %}open{% endif %}>
                 <summary>
                     <strong>{{ month["label"] }}</strong>
-                    <span>{{ month["dates"] | length }}일 · <b class="month-selected-count">{{ month_selected.count }}</b>개 선택</span>
+                    <span>{{ month["dates"] | length }}일 · <b class="month-selected-count">{{ month_selected.count }}</b>일 선택</span>
                 </summary>
-                <div class="date-choice-table">
-                    <div class="date-choice-row date-choice-head">
-                        <span>날짜</span>
-                        {% for slot in time_slots %}<span>{{ slot }}</span>{% endfor %}
-                    </div>
+                <div class="date-grid">
                     {% for day in month["dates"] %}
-                    <div class="date-choice-row">
+                    <div class="date-day-choice">
                         <strong>{{ day["label"] }} ({{ day["weekday"] }})</strong>
-                        {% for slot in time_slots %}
-                        {% set value = day["value"] ~ "|" ~ slot %}
                         <label class="ox-toggle">
-                            <input type="checkbox" name="date_choices" value="{{ value }}" {% if value in selected_dates %}checked{% endif %}>
+                            <input type="checkbox" name="date_choices" value="{{ day['value'] }}" {% if day["value"] in selected_dates %}checked{% endif %}>
                             <span data-on="O" data-off="X"></span>
                         </label>
-                        {% endfor %}
                     </div>
                     {% endfor %}
                 </div>
             </details>
             {% endfor %}
+        </div>
+        <div class="time-choice-section">
+            <div>
+                <strong>가능한 시간대</strong>
+                <p>선택한 날짜들에 공통으로 가능한 시간대를 모두 골라주세요.</p>
+            </div>
+            <div class="time-choice-grid">
+                {% for slot in time_slots %}
+                <label class="theme-check">
+                    <input type="checkbox" name="time_choices" value="{{ slot }}" {% if slot in selected_time_slots %}checked{% endif %}>
+                    <span>{{ slot }}</span>
+                </label>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
     </section>
@@ -80,16 +85,21 @@
         <div class="override-notice">방장이 {{ theme_override | join(", ") }} 테마로 확정했습니다.</div>
         {% else %}
             {% for category, themes in theme_data.items() %}
-            <details class="theme-group" {% if loop.first %}open{% endif %}>
+            <details class="theme-group">
                 <summary>{{ category }}</summary>
+                <label class="theme-search-field">
+                    <span class="sr-only">{{ category }} 검색</span>
+                    <input class="theme-search" type="search" placeholder="{{ category }}에서 검색" autocomplete="off">
+                </label>
                 <div class="theme-options">
                     {% for theme in themes %}
-                    <label class="theme-check">
+                    <label class="theme-check" data-theme-name="{{ theme }}">
                         <input type="checkbox" name="themes" value="{{ theme }}" {% if theme in selected_themes %}checked{% endif %}>
                         <span>{{ theme }}</span>
                     </label>
                     {% endfor %}
                 </div>
+                <p class="theme-search-empty" hidden>일치하는 테마가 없습니다.</p>
             </details>
             {% endfor %}
             <label>

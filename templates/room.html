@@ -56,8 +56,7 @@
             </div>
             <div class="date-rank-items">
             {% for item in group["items"] %}
-            {% set parts = item.split("|") %}
-                <span><b>{{ parts[0] }}</b> {{ parts[1] }}</span>
+                <span><b>{{ item }}</b></span>
             {% endfor %}
             </div>
         </section>
@@ -65,6 +64,12 @@
     </div>
     <p class="handoff-pending">날짜가 확정되면 최종 장소 추천을 실행할 수 있습니다.</p>
     {% endif %}
+    <div class="time-vote-summary">
+        <strong>시간대 투표</strong>
+        {% for item in final_summary["time_slot_counts"] %}
+        <span>{{ item["slot"] }} <b>{{ item["votes"] }}{% if item["votes"] is number %}표{% endif %}</b></span>
+        {% endfor %}
+    </div>
 
     <div class="recommendation-action" data-recommendation-status="{{ recommendation['status'] }}">
         {% if recommendation["status"] == "completed" %}
@@ -112,9 +117,10 @@
         {% endif %}
     </div>
 
-    <div class="member-table" id="member-table" data-status-url="{{ url_for('room_status', room_code=room['code']) }}">
+    <div class="member-table {% if member['role'] == 'host' %}host-member-table{% endif %}" id="member-table" data-status-url="{{ url_for('room_status', room_code=room['code']) }}">
         <div class="member-row member-head">
             <span>이름</span><span>역할</span><span>의견 상태</span>
+            {% if member["role"] == "host" %}<span>관리</span>{% endif %}
         </div>
         {% for item in members %}
         <div class="member-row" data-member-id="{{ item['id'] }}">
@@ -123,6 +129,18 @@
             <span class="submission-state {{ 'done' if item['submitted'] else 'pending' }}">
                 {{ "제출 완료" if item["submitted"] else "작성 전" }}
             </span>
+            {% if member["role"] == "host" %}
+                {% if item["role"] == "host" %}
+                <span class="member-owner-label">방장 본인</span>
+                {% else %}
+                <form method="post"
+                      action="{{ url_for('kick_member', room_code=room['code'], member_id=item['id']) }}"
+                      class="kick-member-form"
+                      data-member-name="{{ item['name'] }}">
+                    <button class="text-button danger" type="submit">내보내기</button>
+                </form>
+                {% endif %}
+            {% endif %}
         </div>
         {% endfor %}
     </div>

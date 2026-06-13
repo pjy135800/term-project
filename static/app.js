@@ -131,6 +131,23 @@ document.addEventListener("DOMContentLoaded", () => {
         refresh();
     });
 
+    document.querySelectorAll(".theme-search").forEach((input) => {
+        const group = input.closest(".theme-group");
+        const options = [...group.querySelectorAll("[data-theme-name]")];
+        const empty = group.querySelector(".theme-search-empty");
+        input.addEventListener("input", () => {
+            const query = input.value.trim().replace(/\s+/g, "").toLocaleLowerCase("ko-KR");
+            let visibleCount = 0;
+            options.forEach((option) => {
+                const name = option.dataset.themeName.replace(/\s+/g, "").toLocaleLowerCase("ko-KR");
+                const visible = !query || name.includes(query);
+                option.hidden = !visible;
+                if (visible) visibleCount += 1;
+            });
+            if (empty) empty.hidden = visibleCount > 0;
+        });
+    });
+
     const surveyThemeCheckboxes = document.querySelectorAll('input[name="themes"]');
     const customThemes = document.getElementById("custom-themes");
     const themeSelectedCount = document.getElementById("theme-selected-count");
@@ -163,6 +180,15 @@ document.addEventListener("DOMContentLoaded", () => {
         customThemes.addEventListener("input", refreshSurveyThemeCount);
     }
     refreshSurveyThemeCount();
+
+    document.querySelectorAll(".kick-member-form").forEach((form) => {
+        form.addEventListener("submit", (event) => {
+            const name = form.dataset.memberName || "이 조원";
+            if (!window.confirm(`${name} 님을 방에서 내보낼까요?\n제출한 의견도 함께 삭제됩니다.`)) {
+                event.preventDefault();
+            }
+        });
+    });
 
     const themeCheckboxes = document.querySelectorAll('input[name="selected_themes"]');
     themeCheckboxes.forEach((checkbox) => {
